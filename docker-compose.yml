@@ -1,0 +1,12 @@
+
+services:
+  app:
+    build:
+      context: .
+      target: builder
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173" # porta padrão do Vite
+    command: npm run dev
