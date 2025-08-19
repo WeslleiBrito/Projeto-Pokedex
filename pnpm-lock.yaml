@@ -94,7 +94,7 @@ importers:
         specifier: ^16.3.0
         version: 16.3.0
       husky:
-        specifier: ^9.0.11
+        specifier: ^9.1.7
         version: 9.1.7
       jsdom:
         specifier: ^26.1.0
