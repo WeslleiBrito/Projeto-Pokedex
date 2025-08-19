@@ -81,11 +81,8 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     
-    # ✅ ADICIONE ESTAS PERMISSÕES (isso está faltando)
     permissions:
       contents: write
-      pages: write
-      id-token: write
       
     steps:
       - name: Checkout code
@@ -97,11 +94,10 @@ jobs:
           version: 8
           run_install: false
 
-      - name: Setup Node.js with pnpm cache
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install
@@ -109,7 +105,6 @@ jobs:
       - name: Build application
         run: pnpm build
 
-      # ✅ Adicione um step para verificar se o build foi bem-sucedido
       - name: Verify build output
         run: |
           echo "Build contents:"
@@ -121,3 +116,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
+          force_orphan: true  # ✅ Força criação da branch
