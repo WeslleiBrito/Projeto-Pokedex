@@ -1,30 +1,30 @@
-# Stage 1: Build
+# Etapa 1 — build da aplicação
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copia package.json e package-lock.json
+# Copia package.json e lockfile
 COPY package*.json ./
+COPY pnpm-lock.yaml* ./
 
-# Instala todas as dependências (incluindo dev)
-RUN npm install
+# Instala pnpm e dependências
+RUN npm install -g pnpm
+RUN pnpm install
 
-# Copia o restante do código
+# Copia código e faz build
 COPY . .
+RUN pnpm build
 
-# Build do projeto
-RUN npm run build
+# Etapa 2 — servidor Nginx
+FROM nginx:alpine
 
-# Stage 2: Runtime
-FROM node:20-alpine
-WORKDIR /app
+# Copia arquivos estáticos para a pasta do Nginx
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Instala serve para rodar o build
-RUN npm install -g serve
+# Copia configuração customizada do Nginx para suportar React Router
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copia apenas o build do stage anterior
-COPY --from=builder /app/dist ./dist
+# Expõe porta 8080
+EXPOSE 8080
 
-EXPOSE 5000
-
-# Comando para rodar a versão de produção
-CMD ["serve", "-s", "dist", "-l", "5000"]
+# Inicia o Nginx no foreground
+CMD ["nginx", "-g", "daemon off;"]
