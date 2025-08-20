@@ -1,119 +1,43 @@
-name: CI/CD Pipeline
+name: Deploy to Google Cloud Run
 
 on:
   push:
-    branches: [ main, master, develop ]
-  pull_request:
-    branches: [ main, master, develop ]
+    branches: ["main"]
 
 jobs:
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install pnpm
-      uses: pnpm/action-setup@v2
-      with:
-        version: 8
-        run_install: false
-
-    - name: Setup Node.js with pnpm cache
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: pnpm install
-
-    - name: Run linting
-      run: pnpm lint
-
-    - name: Run tests with coverage
-      run: pnpm test:coverage
-
-    - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-report
-        path: coverage/
-
-  build:
-    name: Build Application
-    runs-on: ubuntu-latest
-    needs: test
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install pnpm
-      uses: pnpm/action-setup@v2
-      with:
-        version: 8
-        run_install: false
-
-    - name: Setup Node.js with pnpm cache
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'pnpm'
-
-    - name: Install dependencies
-      run: pnpm install
-
-    - name: Build application
-      run: pnpm build
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-artifacts
-        path: dist/
-
   deploy:
-    name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    
-    permissions:
-      contents: write
-      
+
     steps:
-      - name: Checkout code
+      - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
+      - name: Autenticar no Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          version: 8
-          run_install: false
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Configurar gcloud
+        uses: google-github-actions/setup-gcloud@v2
         with:
-          node-version: '20'
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          install_components: 'beta'
 
-      - name: Install dependencies
-        run: pnpm install
+      - name: Configurar Docker auth para Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
 
-      - name: Build application
-        run: pnpm build
-
-      - name: Verify build output
+      - name: Build e Push da imagem
         run: |
-          echo "Build contents:"
-          ls -la dist/
-          [ -f dist/index.html ] && echo "✅ index.html exists" || echo "❌ index.html missing"
+          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/pokedex/app:latest"
+          docker build -t $IMAGE .
+          docker push $IMAGE
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          force_orphan: true  # ✅ Força criação da branch
+      - name: Deploy para Cloud Run
+        run: |
+          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/pokedex/app:latest"
+          gcloud run deploy container-pokedex \
+            --image $IMAGE \
+            --platform managed \
+            --region ${{ secrets.GCP_REGION }} \
+            --allow-unauthenticated \
+            --port 8080
