@@ -1,43 +1,50 @@
-name: Deploy to Google Cloud Run
+name: Deploy para Cloud Run
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main   # ou o branch que você usa para produção
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout do código
       - name: Checkout do código
         uses: actions/checkout@v4
 
+      # 2. Autenticação no Google Cloud
       - name: Autenticar no Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      # 3. Configurar gcloud
       - name: Configurar gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           install_components: 'beta'
 
+      # 4. Configurar Docker para Artifact Registry
       - name: Configurar Docker auth para Artifact Registry
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker southamerica-east1-docker.pkg.dev --quiet
 
+      # 5. Build e Push da imagem Docker
       - name: Build e Push da imagem
         run: |
-          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/pokedex/app:latest"
+          IMAGE="southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/pokedex/app:latest"
           docker build -t $IMAGE .
           docker push $IMAGE
 
+      # 6. Deploy no Cloud Run
       - name: Deploy para Cloud Run
         run: |
-          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/pokedex/app:latest"
+          IMAGE="southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/pokedex/app:latest"
           gcloud run deploy container-pokedex \
             --image $IMAGE \
             --platform managed \
-            --region ${{ secrets.GCP_REGION }} \
+            --region southamerica-east1 \
             --allow-unauthenticated \
             --port 8080
