@@ -84,6 +84,12 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
+# Anexa a política gerenciada do SSM ao IAM Role da instância EC2
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 # --- Security Group
 resource "aws_security_group" "web_sg" {
   name        = "react-web-sg-${random_id.suffix.hex}"
