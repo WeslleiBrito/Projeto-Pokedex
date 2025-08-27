@@ -74,7 +74,9 @@ jobs:
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=react-app-server*" --query "Reservations[].Instances[].InstanceId" --output text --region ${{ env.AWS_REGION }})
           echo "instance-id=$INSTANCE_ID" >> $GITHUB_OUTPUT
-
+      - name: Debug Instance ID
+        run: echo "Instance ID: ${{ steps.get-ec2-id.outputs.instance-id }}"
+        
       - name: Send command to EC2 via SSM
         run: |
           aws ssm send-command \
