@@ -28,17 +28,14 @@ jobs:
         uses: hashicorp/setup-terraform@v2
 
       - name: Terraform Init
-        id: init
         run: terraform init
         working-directory: ./infra
 
       - name: Terraform Validate
-        id: validate
         run: terraform validate
         working-directory: ./infra
 
       - name: Terraform Apply
-        id: apply
         run: terraform apply -auto-approve -var="allowed_ssh_cidr=${{ secrets.ALLOWED_SSH_CIDR }}"
         working-directory: ./infra
         
@@ -72,11 +69,9 @@ jobs:
       - name: Get EC2 Instance ID
         id: get-ec2-id
         run: |
-          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=react-app-server*" --query "Reservations[].Instances[].InstanceId" --output text --region ${{ env.AWS_REGION }})
+          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=react-app-server*" --query "Reservations[].Instances[].InstanceId" --output text)
           echo "instance-id=$INSTANCE_ID" >> $GITHUB_OUTPUT
-      - name: Debug Instance ID
-        run: echo "Instance ID: ${{ steps.get-ec2-id.outputs.instance-id }}"
-        
+
       - name: Send command to EC2 via SSM
         run: |
           aws ssm send-command \
