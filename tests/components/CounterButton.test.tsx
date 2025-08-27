@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent} from "@testing-library/react";
 import { describe, it, expect} from "vitest"
 import {CounterButton} from '../../src/components/CounterButton'
+import '@testing-library/jest-dom';
 
 
 describe("CounterButton component", () => {

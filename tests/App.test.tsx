@@ -4,65 +4,46 @@ import '@testing-library/jest-dom';
 import { describe, it, expect } from 'vitest';
 import App from '../src/App';
 
-describe('App Component', () => {
-  it('deve renderizar o título principal', () => {
+describe('App Component - Pokédex', () => {
+  it('deve renderizar o logo da Pokédex', () => {
     render(<App />);
-    expect(screen.getByText('Vite + React')).toBeInTheDocument();
+    const logo = screen.getByAltText('Pokédex Logo');
+    expect(logo).toBeInTheDocument();
+    expect(logo).toHaveAttribute('src', '/img/logo.png');
   });
 
-  it('deve renderizar os logos do Vite e React', () => {
+  it('deve renderizar a imagem de fundo da Pokédex', () => {
     render(<App />);
-    
-    const viteLogo = screen.getByAltText('Vite logo');
-    const reactLogo = screen.getByAltText('React logo');
-    
-    expect(viteLogo).toBeInTheDocument();
-    expect(reactLogo).toBeInTheDocument();
-    expect(viteLogo).toHaveAttribute('src', '/vite.svg');
-    expect(reactLogo).toHaveAttribute('src', '/src/assets/react.svg');
+    const bg = screen.getByAltText('Pokédex background');
+    expect(bg).toBeInTheDocument();
+    expect(bg).toHaveAttribute('src', '/img/pokedex-bg.png');
   });
 
-  it('deve renderizar o botão de contador com valor inicial 0', () => {
+  it('deve exibir o estado inicial de carregamento', () => {
     render(<App />);
-    expect(screen.getByText('count is 0')).toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
   });
 
-  it('deve incrementar o contador quando o botão for clicado', () => {
+  it('deve renderizar a caixa de busca', () => {
     render(<App />);
-    const button = screen.getByText('count is 0');
-    
-    fireEvent.click(button);
-    expect(screen.getByText('count is 1')).toBeInTheDocument();
-    
-    fireEvent.click(button);
-    expect(screen.getByText('count is 2')).toBeInTheDocument();
+    const input = screen.getByPlaceholderText('Nome ou número do pokémon');
+    expect(input).toBeInTheDocument();
   });
 
-  it('deve renderizar o texto de instrução', () => {
+  it('deve renderizar os botões de navegação', () => {
     render(<App />);
-    
-    // ✅ SOLUÇÃO DEFINITIVA: Encontra o parágrafo pelo contexto
-    const cardDiv = screen.getByText('count is 0').closest('.card');
-    const paragraph = cardDiv?.querySelector('p');
-    
-    expect(paragraph).toBeInTheDocument();
-    expect(paragraph).toHaveTextContent('Edit src/App.tsx and save to test HMR');
+    expect(screen.getByText('⬅ Anterior')).toBeInTheDocument();
+    expect(screen.getByText('Próximo ➡')).toBeInTheDocument();
+    expect(screen.getByText('Aleatório')).toBeInTheDocument();
   });
 
-  it('deve renderizar o link de documentação', () => {
+  it('deve permitir buscar um Pokémon digitando no input', () => {
     render(<App />);
-    expect(screen.getByText('Click on the Vite and React logos to learn more')).toBeInTheDocument();
-  });
+    const input = screen.getByPlaceholderText('Nome ou número do pokémon') as HTMLInputElement;
+    const form = input.closest('form');
+    expect(form).toBeInTheDocument();
 
-  it('deve ter links com target _blank', () => {
-    render(<App />);
-    
-    const viteLink = screen.getByAltText('Vite logo').closest('a');
-    const reactLink = screen.getByAltText('React logo').closest('a');
-    
-    expect(viteLink).toHaveAttribute('target', '_blank');
-    expect(reactLink).toHaveAttribute('target', '_blank');
-    expect(viteLink).toHaveAttribute('href', 'https://vite.dev');
-    expect(reactLink).toHaveAttribute('href', 'https://react.dev');
+    fireEvent.change(input, { target: { value: 'pikachu' } });
+    expect(input.value).toBe('pikachu');
   });
 });

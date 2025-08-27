@@ -1,50 +1,81 @@
-name: Deploy para Cloud Run
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
-      - main   # ou o branch que você usa para produção
+      - main
+
+env:
+  AWS_REGION: sa-east-1
+  ECR_REPOSITORY: react-app
 
 jobs:
-  deploy:
+  terraform:
+    name: "Terraform Apply"
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Checkout do código
-      - name: Checkout do código
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      # 2. Autenticação no Google Cloud
-      - name: Autenticar no Google Cloud
-        uses: google-github-actions/auth@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # 3. Configurar gcloud
-      - name: Configurar gcloud
-        uses: google-github-actions/setup-gcloud@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve -var="allowed_ssh_cidr=${{ secrets.ALLOWED_SSH_CIDR }}"
+        
+  deploy:
+    name: "Deploy Application"
+    runs-on: ubuntu-latest
+    needs: terraform
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          install_components: 'beta'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # 4. Configurar Docker para Artifact Registry
-      - name: Configurar Docker auth para Artifact Registry
-        run: gcloud auth configure-docker southamerica-east1-docker.pkg.dev --quiet
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
 
-      # 5. Build e Push da imagem Docker
-      - name: Build e Push da imagem
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          IMAGE="southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/pokedex/app:latest"
-          docker build -t $IMAGE .
-          docker push $IMAGE
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # 6. Deploy no Cloud Run
-      - name: Deploy para Cloud Run
+      - name: Get EC2 Instance ID
+        id: get-ec2-id
         run: |
-          IMAGE="southamerica-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/pokedex/app:latest"
-          gcloud run deploy container-pokedex \
-            --image $IMAGE \
-            --platform managed \
-            --region southamerica-east1 \
-            --allow-unauthenticated \
-            --port 8080
+          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=react-app-server*" --query "Reservations[].Instances[].InstanceId" --output text --region ${{ env.AWS_REGION }})
+          echo "instance-id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      - name: Send command to EC2 via SSM
+        run: |
+          aws ssm send-command \
+            --instance-ids ${{ steps.get-ec2-id.outputs.instance-id }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}", "docker stop $(docker ps -a -q --filter ancestor=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}) || true", "docker run -d --rm -p 80:80 --name react-app ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"]' \
+            --region ${{ env.AWS_REGION }}
