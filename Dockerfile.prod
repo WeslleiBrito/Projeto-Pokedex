@@ -23,8 +23,6 @@ FROM nginx:alpine
 # Copia a pasta de build da etapa anterior para o diretório do Nginx
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copia o template de configuração do Nginx (se houver)
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 # Expõe a porta que o Nginx usará
 EXPOSE 80
