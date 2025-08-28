@@ -104,6 +104,7 @@ jobs:
             --output text)
           
           echo "command-id=$COMMAND_ID" >> $GITHUB_OUTPUT
+        working-directory: ./infra
 
       - name: Wait and verify SSM execution
         run: |
