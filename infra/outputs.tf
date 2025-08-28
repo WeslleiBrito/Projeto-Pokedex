@@ -17,3 +17,7 @@ output "security_group_id" {
   description = "ID do Security Group da aplicação"
   value       = aws_security_group.web_sg.id
 }
+
+output "instance_id" {
+  value = aws_instance.react-app.id
+}
