@@ -27,11 +27,6 @@ resource "aws_ecr_repository" "repo" {
   }
 }
 
-# --- Suffix for unique names
-resource "random_id" "suffix" {
-  byte_length = 2
-}
-
 # --- IAM role for EC2
 data "aws_iam_policy_document" "assume_for_ec2" {
   statement {
@@ -44,7 +39,7 @@ data "aws_iam_policy_document" "assume_for_ec2" {
 }
 
 resource "aws_iam_role" "ec2_role" {
-  name               = "ec2-ecr-role-${random_id.suffix.hex}"
+  name               = "ec2-ecr-role-react-app"
   assume_role_policy = data.aws_iam_policy_document.assume_for_ec2.json
 }
 
@@ -74,13 +69,13 @@ data "aws_iam_policy_document" "ec2_ecr_policy" {
 }
 
 resource "aws_iam_role_policy" "ec2_ecr_policy_attach" {
-  name   = "ec2-ecr-policy-${random_id.suffix.hex}"
+  name   = "ec2-ecr-policy-react-app"
   role   = aws_iam_role.ec2_role.id
   policy = data.aws_iam_policy_document.ec2_ecr_policy.json
 }
 
 resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "ec2-profile-${random_id.suffix.hex}"
+  name = "ec2-profile-react-app"
   role = aws_iam_role.ec2_role.name
 }
 
@@ -92,7 +87,7 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
 
 # --- Security Group
 resource "aws_security_group" "web_sg" {
-  name        = "react-web-sg-${random_id.suffix.hex}"
+  name        = "react-web-sg"
   description = "Allow SSH, HTTP and HTTPS"
   vpc_id      = data.aws_vpc.default.id
 
