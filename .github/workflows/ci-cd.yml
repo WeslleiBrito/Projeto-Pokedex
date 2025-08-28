@@ -42,7 +42,7 @@ jobs:
       - name: Aguarda EC2 ficar pronta
         run: |
           echo "Obtendo o ID da instância criada via Terraform..."
-          INSTANCE_ID=$(terraform output -raw instance_id 2>/dev/null)
+          INSTANCE_ID=$(terraform output -raw instance_id | grep 'i-' | awk '{print $1}')
           
           echo "Instância criada: $INSTANCE_ID"
           echo "Aguardando os status checks passarem..."
