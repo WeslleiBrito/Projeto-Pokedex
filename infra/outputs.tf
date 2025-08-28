@@ -19,5 +19,5 @@ output "security_group_id" {
 }
 
 output "instance_id" {
-  value = aws_instance.react-app.id
+  value = aws_instance.app.id
 }
