@@ -94,7 +94,6 @@ export default function App() {
             alt="Pokédex background"
             className="pokedex-bg"
           />
-          <h1>Teste de mudança no código e não na infra</h1>
           <div className="pokemon-center">
             <img
               src={sprite}
