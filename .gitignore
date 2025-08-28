@@ -25,8 +25,4 @@ dist-ssr
 *.sw?
 .env
 .terraform/
-.terraform.lock.hcl
 awscliv2.zip
-terraform.tfstate.backup
-terraform.tfstate
-*.tfstate
