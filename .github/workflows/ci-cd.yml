@@ -70,7 +70,7 @@ jobs:
         id: get-ec2-id
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=react-app-server" \
+            --filters "Name=tag:Name,Values=react-app-server" "Name=instance-state-name,Values=running" \
             --query "Reservations[].Instances[].InstanceId" \
             --output text)
           echo "instance-id=$INSTANCE_ID" >> $GITHUB_OUTPUT
