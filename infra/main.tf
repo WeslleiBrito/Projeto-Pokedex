@@ -143,7 +143,7 @@ resource "aws_instance" "app" {
   associate_public_ip_address = true
 
   tags = {
-    Name = "react-app-server-${random_id.suffix.hex}"
+    Name = "react-app-server"
   }
 
   user_data = <<-EOF
