@@ -147,31 +147,30 @@ resource "aws_instance" "app" {
   }
 
   user_data = <<-EOF
-              #!/bin/bash
-              set -e
-              apt-get update -y
-              apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release unzip
+            #!/bin/bash
+            set -e
+            apt-get update -y
+            apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release unzip
 
-              # Docker
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-              add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-              apt-get update -y
-              apt-get install -y docker-ce docker-ce-cli containerd.io
-              usermod -aG docker ubuntu
+            # Docker
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+            add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+            apt-get update -y
+            apt-get install -y docker-ce docker-ce-cli containerd.io
+            usermod -aG docker ubuntu
 
-              # AWS CLI v2
-              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-              unzip awscliv2.zip
-              ./aws/install
+            # AWS CLI v2
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            ./aws/install
 
-              # Habilitar Docker
-              systemctl enable docker
-              systemctl start docker
+            # Instalar SSM Agent no Ubuntu
+            snap install amazon-ssm-agent --classic
+            systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
+            systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service
 
-              # Instalar e habilitar o SSM Agent
-              snap install amazon-ssm-agent --classic
-              systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
-              systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service
-              EOF
+            systemctl enable docker
+            systemctl start docker
+            EOF
 
 }
