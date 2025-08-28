@@ -38,18 +38,7 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve -var="allowed_ssh_cidr=${{ secrets.ALLOWED_SSH_CIDR }}"
         working-directory: ./infra
-      
-      - name: Aguarda EC2 ficar pronta
-        run: |
-          echo "Obtendo o ID da instância criada via Terraform..."
-          INSTANCE_ID=$(terraform output -raw instance_id | grep 'i-' | awk '{print $1}')
-          
-          echo "Instância criada: $INSTANCE_ID"
-          echo "Aguardando os status checks passarem..."
-          aws ec2 wait instance-status-ok --instance-ids $INSTANCE_ID
-          echo "Instância $INSTANCE_ID pronta para receber comandos!"
-        working-directory: ./infra
-        
+
   deploy:
     name: "Deploy Application"
     runs-on: ubuntu-latest
@@ -81,11 +70,17 @@ jobs:
         id: get-ec2-id
         run: |
           INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=react-app-server*" \
+            --filters "Name=tag:Name,Values=react-app-server" \
             --query "Reservations[].Instances[].InstanceId" \
             --output text)
           echo "instance-id=$INSTANCE_ID" >> $GITHUB_OUTPUT
-
+        
+      - name: Wait for EC2 Instance Status Ok
+        run: |
+          echo "Aguardando os status checks passarem..."
+          aws ec2 wait instance-status-ok --instance-ids ${{ steps.get-ec2-id.outputs.instance-id }}
+          echo "Instância ${{ steps.get-ec2-id.outputs.instance-id }} pronta para receber comandos!"
+          
       - name: Send command to EC2 via SSM
         id: deploy-command
         run: |
