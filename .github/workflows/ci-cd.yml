@@ -69,13 +69,45 @@ jobs:
       - name: Get EC2 Instance ID
         id: get-ec2-id
         run: |
-          INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=react-app-server*" --query "Reservations[].Instances[].InstanceId" --output text)
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=react-app-server*" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
           echo "instance-id=$INSTANCE_ID" >> $GITHUB_OUTPUT
 
       - name: Send command to EC2 via SSM
+        id: deploy-command
         run: |
-          aws ssm send-command \
+          COMMAND_ID=$(aws ssm send-command \
             --instance-ids ${{ steps.get-ec2-id.outputs.instance-id }} \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=["docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}", "docker stop $(docker ps -a -q --filter ancestor=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}) || true", "docker run -d --rm -p 80:80 --name react-app ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"]' \
-            --region ${{ env.AWS_REGION }}
+            --comment "Deploy React App container" \
+            --parameters 'commands=[
+              "docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}",
+              "docker stop react-app || true && docker rm react-app || true",
+              "docker run -d --name react-app -p 80:80 ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
+            ]' \
+            --region ${{ env.AWS_REGION }} \
+            --query "Command.CommandId" \
+            --output text)
+          
+          echo "command-id=$COMMAND_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait and verify SSM execution
+        run: |
+          STATUS="InProgress"
+          for i in {1..10}; do
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id ${{ steps.deploy-command.outputs.command-id }} \
+              --details \
+              --query "CommandInvocations[0].Status" \
+              --output text)
+            echo "Current status: $STATUS"
+            if [ "$STATUS" != "InProgress" ]; then break; fi
+            sleep 10
+          done
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "SSM command failed with status: $STATUS"
+            exit 1
+          fi
