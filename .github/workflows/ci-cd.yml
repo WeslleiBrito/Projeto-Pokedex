@@ -40,9 +40,6 @@ jobs:
         working-directory: ./infra
       
       # Depois do passo que cria a instância EC2 com Terraform
-      - name: Terraform Apply
-        run: terraform apply -auto-approve
-
       - name: Aguarda EC2 ficar pronta
         run: |
           echo "Obtendo o ID da instância criada via Terraform..."
