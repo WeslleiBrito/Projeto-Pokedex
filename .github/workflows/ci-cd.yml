@@ -83,8 +83,9 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --comment "Deploy React App container" \
             --parameters 'commands=[
-              "docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}",
+              "aws ecr get-login-password --region sa-east-1 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
               "docker stop react-app || true && docker rm react-app || true",
+              "docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}",
               "docker run -d --name react-app -p 80:80 ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
             ]' \
             --region ${{ env.AWS_REGION }} \
