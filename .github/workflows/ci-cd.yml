@@ -81,6 +81,27 @@ jobs:
           aws ec2 wait instance-status-ok --instance-ids ${{ steps.get-ec2-id.outputs.instance-id }}
           echo "Instância ${{ steps.get-ec2-id.outputs.instance-id }} pronta para receber comandos!"
           
+      - name: Wait for SSM Agent to be ready
+        run: |
+          echo "Aguardando o SSM Agent ficar online..."
+          for i in {1..16}; do
+            STATUS=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=${{ steps.get-ec2-id.outputs.instance-id }}" \
+              --query "InstanceInformationList[0].PingStatus" \
+              --output text)
+            echo "Status atual do SSM Agent: $STATUS"
+            if [ "$STATUS" == "Online" ]; then
+              echo "SSM Agent está online. Prosseguindo..."
+              break
+            fi
+            sleep 30
+          done
+
+          if [ "$STATUS" != "Online" ]; then
+            echo "Erro: O SSM Agent não ficou online a tempo."
+            exit 1
+          fi
+
       - name: Send command to EC2 via SSM
         id: deploy-command
         run: |
