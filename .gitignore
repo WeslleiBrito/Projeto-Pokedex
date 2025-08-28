@@ -29,3 +29,4 @@ dist-ssr
 awscliv2.zip
 terraform.tfstate.backup
 terraform.tfstate
+*.tfstate
