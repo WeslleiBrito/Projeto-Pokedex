@@ -39,16 +39,16 @@ jobs:
         run: terraform apply -auto-approve -var="allowed_ssh_cidr=${{ secrets.ALLOWED_SSH_CIDR }}"
         working-directory: ./infra
       
-      # Depois do passo que cria a instância EC2 com Terraform
       - name: Aguarda EC2 ficar pronta
         run: |
           echo "Obtendo o ID da instância criada via Terraform..."
           INSTANCE_ID=$(terraform output -raw instance_id)
-
+          
           echo "Instância criada: $INSTANCE_ID"
           echo "Aguardando os status checks passarem..."
           aws ec2 wait instance-status-ok --instance-ids $INSTANCE_ID
           echo "Instância $INSTANCE_ID pronta para receber comandos!"
+        working-directory: ./infra
         
   deploy:
     name: "Deploy Application"
