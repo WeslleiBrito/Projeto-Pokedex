@@ -13,7 +13,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9  # ou a versão que você usa
+          version: 9  
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
