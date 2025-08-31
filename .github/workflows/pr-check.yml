@@ -9,22 +9,32 @@ jobs:
   test:
     name: "Run Tests on PR"
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
+      # Passo 1: Configurar o pnpm primeiro
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # Passo 2: Configurar o Node.js e usar o pnpm para o cache
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
+          cache: 'pnpm'
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9  
-          
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm test:ci
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint code
+        run: pnpm lint
+
+      - name: Run tests with coverage
+        run: pnpm test:ci

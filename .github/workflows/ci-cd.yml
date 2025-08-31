@@ -14,14 +14,28 @@ jobs:
     name: "Run Tests"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
-      - run: pnpm ci
-      - run: pnpm run lint
-      - run: pnpm run test:ci
+          cache: 'pnpm'   # habilita cache automático do pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint code
+        run: pnpm run lint
+
+      - name: Run tests with coverage
+        run: pnpm run test:ci
 
   terraform:
     name: "Terraform Apply"
