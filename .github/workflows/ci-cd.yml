@@ -19,9 +19,9 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 20
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run test:ci
+      - run: pnpm ci
+      - run: pnpm run lint
+      - run: pnpm run test:ci
 
   terraform:
     name: "Terraform Apply"
