@@ -9,8 +9,10 @@ jobs:
   test:
     name: "Run Tests on PR"
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
@@ -19,12 +21,18 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 20
+          cache: 'pnpm'   # habilita cache automático para pnpm
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9  
-          
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm test:ci
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint code
+        run: pnpm lint
+
+      - name: Run tests with coverage
+        run: pnpm test:ci
