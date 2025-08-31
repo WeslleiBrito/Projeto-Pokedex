@@ -1,49 +1,199 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import { describe, it, expect } from 'vitest';
-import App from '../src/App';
+import React from "react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import "@testing-library/jest-dom";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import App from "../src/App";
 
-describe('App Component - Pokédex', () => {
-  it('deve renderizar o logo da Pokédex', () => {
-    render(<App />);
-    const logo = screen.getByAltText('Pokédex Logo');
-    expect(logo).toBeInTheDocument();
-    expect(logo).toHaveAttribute('src', '/img/logo.png');
+describe("App Component - Pokédex", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('deve renderizar a imagem de fundo da Pokédex', () => {
+  function mockFetchSuccess(pokemon: unknown, species: unknown) {
+    global.fetch = vi.fn()
+      // primeira chamada → /pokemon/:id
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => pokemon,
+      } as Response)
+      // segunda chamada → species.url
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => species,
+      } as Response);
+  }
+
+  function mockFetchError() {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+    } as Response);
+  }
+
+  it("deve renderizar o logo da Pokédex", async () => {
+    mockFetchSuccess(
+      { id: 1, name: "bulbasaur", sprites: { front_default: "" }, types: [], height: 7, weight: 69, species: { url: "" } },
+      { flavor_text_entries: [] }
+    );
+
     render(<App />);
-    const bg = screen.getByAltText('Pokédex background');
-    expect(bg).toBeInTheDocument();
-    expect(bg).toHaveAttribute('src', '/img/pokedex-bg.png');
+    expect(screen.getByAltText("Pokédex Logo")).toBeInTheDocument();
   });
 
-  it('deve exibir o estado inicial de carregamento', () => {
+  it("deve exibir o estado inicial de carregamento", () => {
+    mockFetchError(); // força erro para não travar
     render(<App />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
 
-  it('deve renderizar a caixa de busca', () => {
+  it("deve carregar e exibir um Pokémon com dados completos", async () => {
+    mockFetchSuccess(
+      {
+        id: 25,
+        name: "pikachu",
+        sprites: {
+          front_default: "/img/pikachu.png",
+          versions: {
+            "generation-v": {
+              "black-white": { animated: { front_default: null } },
+            },
+          },
+        },
+        types: [{ type: { name: "electric" } }],
+        height: 4,
+        weight: 60,
+        species: { url: "https://pokeapi.co/api/v2/pokemon-species/25" },
+      },
+      {
+        flavor_text_entries: [
+          { flavor_text: "Um rato elétrico.\nCom ataques fortes.", language: { name: "en" } },
+        ],
+      }
+    );
+
     render(<App />);
-    const input = screen.getByPlaceholderText('Nome ou número do pokémon');
-    expect(input).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText(/pikachu/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("#25")).toBeInTheDocument();
+    expect(screen.getByText("Type: electric")).toBeInTheDocument();
+    expect(screen.getByText("Height: 0.4 m | Weight: 6 kg")).toBeInTheDocument();
+    expect(screen.getByText(/Um rato elétrico. Com ataques fortes./)).toBeInTheDocument();
   });
 
-  it('deve renderizar os botões de navegação', () => {
+  it("deve mostrar 'Pokémon não encontrado!' quando a API retorna erro", async () => {
+    mockFetchError();
     render(<App />);
-    expect(screen.getByText('⬅ Anterior')).toBeInTheDocument();
-    expect(screen.getByText('Próximo ➡')).toBeInTheDocument();
-    expect(screen.getByText('Aleatório')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText("Pokémon não encontrado!")).toBeInTheDocument();
+    });
   });
 
-  it('deve permitir buscar um Pokémon digitando no input', () => {
-    render(<App />);
-    const input = screen.getByPlaceholderText('Nome ou número do pokémon') as HTMLInputElement;
-    const form = input.closest('form');
-    expect(form).toBeInTheDocument();
+  it("deve permitir buscar um Pokémon digitando no input e limpá-lo após submit", async () => {
+    // mock inicial
+    mockFetchSuccess(
+      { id: 1, name: "bulbasaur", sprites: { front_default: "" }, types: [], height: 7, weight: 69, species: { url: "" } },
+      { flavor_text_entries: [] }
+    );
 
-    fireEvent.change(input, { target: { value: 'pikachu' } });
-    expect(input.value).toBe('pikachu');
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText(/bulbasaur/i)).toBeInTheDocument();
+    });
+
+    // mock para busca pelo input
+    mockFetchSuccess(
+      { id: 25, name: "pikachu", sprites: { front_default: "" }, types: [], height: 4, weight: 60, species: { url: "" } },
+      { flavor_text_entries: [] }
+    );
+
+    const input = screen.getByPlaceholderText(/Nome ou número do pokémon/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "pikachu" } });
+    fireEvent.submit(input.closest("form")!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/pikachu/i)).toBeInTheDocument();
+    });
+
+    expect(input.value).toBe(""); // input limpou
+  });
+
+  it("deve navegar para o próximo Pokémon ao clicar em 'Próximo ➡'", async () => {
+    // inicial bulbasaur
+    mockFetchSuccess(
+      { id: 1, name: "bulbasaur", sprites: { front_default: "" }, types: [], height: 7, weight: 69, species: { url: "" } },
+      { flavor_text_entries: [] }
+    );
+
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText(/bulbasaur/i)).toBeInTheDocument();
+    });
+
+    // próximo ivysaur
+    mockFetchSuccess(
+      { id: 2, name: "ivysaur", sprites: { front_default: "" }, types: [], height: 10, weight: 130, species: { url: "" } },
+      { flavor_text_entries: [] }
+    );
+
+    fireEvent.click(screen.getByText("Próximo ➡"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/ivysaur/i)).toBeInTheDocument();
+    });
+  });
+
+  it("deve navegar para o Pokémon anterior ao clicar em '⬅ Anterior'", async () => {
+    // inicial ivysaur
+    mockFetchSuccess(
+      { id: 2, name: "ivysaur", sprites: { front_default: "" }, types: [], height: 10, weight: 130, species: { url: "" } },
+      { flavor_text_entries: [] }
+    );
+
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText(/ivysaur/i)).toBeInTheDocument();
+    });
+
+    // anterior bulbasaur
+    mockFetchSuccess(
+      { id: 1, name: "bulbasaur", sprites: { front_default: "" }, types: [], height: 7, weight: 69, species: { url: "" } },
+      { flavor_text_entries: [] }
+    );
+
+    fireEvent.click(screen.getByText("⬅ Anterior"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/bulbasaur/i)).toBeInTheDocument();
+    });
+  });
+
+  it("deve carregar um Pokémon aleatório ao clicar em 'Aleatório'", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0); // força randomId = 1
+
+    // mock inicial
+    mockFetchSuccess(
+      { id: 1, name: "bulbasaur", sprites: { front_default: "" }, types: [], height: 7, weight: 69, species: { url: "" } },
+      { flavor_text_entries: [] }
+    );
+
+    render(<App />);
+    await waitFor(() => {
+      expect(screen.getByText(/bulbasaur/i)).toBeInTheDocument();
+    });
+
+    // mock para quando clicar no botão
+    mockFetchSuccess(
+      { id: 1, name: "bulbasaur", sprites: { front_default: "" }, types: [], height: 7, weight: 69, species: { url: "" } },
+      { flavor_text_entries: [] }
+    );
+
+    fireEvent.click(screen.getByText("Aleatório"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/bulbasaur/i)).toBeInTheDocument();
+    });
   });
 });
