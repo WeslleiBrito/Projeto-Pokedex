@@ -27,4 +27,3 @@ dist-ssr
 .terraform/
 awscliv2.zip
 /coverage
-
