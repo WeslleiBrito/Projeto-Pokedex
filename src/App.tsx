@@ -1,28 +1,9 @@
 import { useState, useEffect } from "react";
+import type { PokemonData } from './types/types';
 
 const MAX_POKEMON = 1010;
 
-type PokemonData = {
-  id: number;
-  name: string;
-  sprites: {
-    front_default: string | null;
-    versions: {
-      ["generation-v"]: {
-        ["black-white"]: {
-          animated: {
-            front_default: string | null;
-          };
-        };
-      };
-    };
-  };
-  types: { type: { name: string } }[];
-  height: number;
-  weight: number;
-  species: { url: string };
-  description?: string;
-};
+
 
 async function fetchPokemon(pokemon: string | number): Promise<PokemonData | null> {
   try {
@@ -40,7 +21,7 @@ async function fetchPokemon(pokemon: string | number): Promise<PokemonData | nul
     };
 
     const flavor = speciesData.flavor_text_entries.find(
-      (entry: FlavorTextEntry) => entry.language.name === "en"
+      (entry: FlavorTextEntry) => entry.language.name === "pt-br"
     );
 
     return {
