@@ -46,41 +46,54 @@ describe("App Component - Pokédex", () => {
   });
 
   it("deve carregar e exibir um Pokémon com dados completos", async () => {
-    mockFetchSuccess(
-      {
-        id: 25,
-        name: "pikachu",
-        sprites: {
-          front_default: "/img/pikachu.png",
-          versions: {
-            "generation-v": {
-              "black-white": { animated: { front_default: null } },
-            },
+  mockFetchSuccess(
+    {
+      id: 25,
+      name: "pikachu",
+      sprites: {
+        front_default: "/img/pikachu.png",
+        versions: {
+          "generation-v": {
+            "black-white": { animated: { front_default: null } },
           },
         },
-        types: [{ type: { name: "electric" } }],
-        height: 4,
-        weight: 60,
-        species: { url: "https://pokeapi.co/api/v2/pokemon-species/25" },
       },
-      {
-        flavor_text_entries: [
-          { flavor_text: "Um rato elétrico.\nCom ataques fortes.", language: { name: "en" } },
-        ],
-      }
-    );
+      types: [{ type: { name: "electric" } }],
+      height: 4,
+      weight: 60,
+      species: { url: "https://pokeapi.co/api/v2/pokemon-species/25" },
+    },
+    {
+      flavor_text_entries: [
+        { flavor_text: "Um rato elétrico. Com ataques fortes.", language: { name: "pt-br" } },
+      ],
+    }
+  );
 
-    render(<App />);
+  render(<App />);
 
-    await waitFor(() => {
-      expect(screen.getByText(/pikachu/i)).toBeInTheDocument();
-    });
+  // Use o 'waitFor' para todas as asserções que dependem da API.
+  await waitFor(() => {
+    // Verifique o texto do nome do Pokémon primeiro
+    expect(screen.getByText(/pikachu/i)).toBeInTheDocument();
 
+    // Verifique se os outros elementos estão presentes
     expect(screen.getByText("#25")).toBeInTheDocument();
     expect(screen.getByText("Type: electric")).toBeInTheDocument();
     expect(screen.getByText("Height: 0.4 m | Weight: 6 kg")).toBeInTheDocument();
-    expect(screen.getByText(/Um rato elétrico. Com ataques fortes./)).toBeInTheDocument();
+
+    const descriptionText = "Um rato elétrico. Com ataques fortes.";
+    expect(
+      screen.getByText((content, element) => {
+        const hasText = (text: string) => content.includes(text);
+        const elementHasText = hasText(descriptionText);
+        const elementIsParagraph = element?.tagName.toLowerCase() === "p";
+        return Boolean(elementIsParagraph && elementHasText);
+      })
+    ).toBeInTheDocument();
+
   });
+});
 
   it("deve mostrar 'Pokémon não encontrado!' quando a API retorna erro", async () => {
     mockFetchError();
