@@ -21,7 +21,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 20
-          cache: 'pnpm'   # habilita cache automático do pnpm
+          cache: 'pnpm'
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -62,13 +62,16 @@ jobs:
     needs: terraform
     steps:
       - uses: actions/checkout@v3
+
       - uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
       - uses: aws-actions/amazon-ecr-login@v1
         id: login-ecr
+
       - name: Build, tag, and push image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -76,6 +79,7 @@ jobs:
         run: |
           docker build -f Dockerfile.prod -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
@@ -83,6 +87,7 @@ jobs:
           format: 'table'
           exit-code: '1'
           severity: 'HIGH,CRITICAL'
+
       - name: Get EC2 Instance ID
         id: get-ec2-id
         run: |
@@ -91,9 +96,11 @@ jobs:
             --query "Reservations[].Instances[].InstanceId" \
             --output text)
           echo "instance-id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
       - name: Wait for EC2 Instance Status Ok
         run: |
           aws ec2 wait instance-status-ok --instance-ids ${{ steps.get-ec2-id.outputs.instance-id }}
+
       - name: Wait for SSM Agent to be ready
         run: |
           for i in {1..16}; do
@@ -102,9 +109,14 @@ jobs:
               --query "InstanceInformationList[0].PingStatus" \
               --output text)
             if [ "$STATUS" == "Online" ]; then break; fi
+            echo "SSM Agent ainda não está pronto. Tentativa $i..."
             sleep 30
           done
-          if [ "$STATUS" != "Online" ]; then exit 1; fi
+          if [ "$STATUS" != "Online" ]; then
+            echo "❌ SSM Agent não ficou online a tempo."
+            exit 1
+          fi
+
       - name: Deploy via SSM
         id: deploy-command
         run: |
@@ -122,6 +134,7 @@ jobs:
             --query "Command.CommandId" \
             --output text)
           echo "command-id=$COMMAND_ID" >> $GITHUB_OUTPUT
+
       - name: Verify SSM execution
         run: |
           STATUS="InProgress"
@@ -131,18 +144,33 @@ jobs:
               --details \
               --query "CommandInvocations[0].Status" \
               --output text)
+            echo "SSM status: $STATUS"
             if [ "$STATUS" != "InProgress" ]; then break; fi
             sleep 10
           done
-          if [ "$STATUS" != "Success" ]; then exit 1; fi
+          if [ "$STATUS" != "Success" ]; then
+            echo "❌ Deploy falhou com status: $STATUS"
+            exit 1
+          fi
+
       - name: Health check
         run: |
           EC2_IP=$(aws ec2 describe-instances \
             --instance-ids ${{ steps.get-ec2-id.outputs.instance-id }} \
             --query "Reservations[].Instances[].PublicIpAddress" \
             --output text)
+
+          echo "🔎 Verificando health-check em http://$EC2_IP/healthz"
+
           for i in {1..10}; do
-            curl -s http://$EC2_IP/healthz && exit 0
-            sleep 5
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://$EC2_IP/healthz)
+            if [ "$STATUS" == "200" ]; then
+              echo "✅ Aplicação saudável!"
+              exit 0
+            fi
+            echo "⏳ Tentativa $i: ainda não está no ar (status=$STATUS)"
+            sleep 10
           done
+
+          echo "❌ Aplicação não respondeu 200 OK no /healthz"
           exit 1
