@@ -21,7 +21,8 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 20
-          cache: 'pnpm'   # habilita cache automático do pnpm
+          run_install: false
+          cache: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
