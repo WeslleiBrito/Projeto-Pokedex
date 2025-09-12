@@ -22,14 +22,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Instala o pnpm primeiro
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
           run_install: false
 
-      # Só depois configura o Node + cache
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -44,7 +42,6 @@ jobs:
   
       - name: Run tests with coverage
         run: pnpm run test:ci
-
 
   terraform:
     name: "Terraform Apply"
@@ -186,3 +183,22 @@ jobs:
 
           echo "❌ Aplicação não respondeu 200 OK no /healthz"
           exit 1
+
+  release:
+    name: "Create GitHub Release"
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success() && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          release_name: "Release v1.0.${{ github.run_number }}"
+          draft: false
+          prerelease: false
