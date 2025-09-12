@@ -129,6 +129,9 @@ jobs:
       - name: Deploy via SSM
         id: deploy-command
         run: |
+          # Recupera parâmetro de configuração no SSM (exemplo API_URL)
+          API_URL=$(aws ssm get-parameter --name "/react-app/API_URL" --query "Parameter.Value" --output text)
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids ${{ steps.get-ec2-id.outputs.instance-id }} \
             --document-name "AWS-RunShellScript" \
@@ -137,7 +140,13 @@ jobs:
               "aws ecr get-login-password --region sa-east-1 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
               "docker stop react-app || true && docker rm react-app || true",
               "docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}",
-              "docker run -d --name react-app -p 80:80 ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
+              "docker run -d --name react-app -p 80:80 \
+                --log-driver=awslogs \
+                --log-opt awslogs-region=${{ env.AWS_REGION }} \
+                --log-opt awslogs-group=react-app-logs \
+                --log-opt awslogs-stream=instance-$(hostname) \
+                -e API_URL='$API_URL' \
+                ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
             ]' \
             --region ${{ env.AWS_REGION }} \
             --query "Command.CommandId" \
@@ -183,6 +192,7 @@ jobs:
 
           echo "❌ Aplicação não respondeu 200 OK no /healthz"
           exit 1
+
 
   release:
     name: "Create GitHub Release"
