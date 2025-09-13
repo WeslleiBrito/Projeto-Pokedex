@@ -169,3 +169,78 @@ resource "aws_instance" "app" {
             EOF
 
 }
+
+
+resource "null_resource" "build_lambda" {
+  provisioner "local-exec" {
+    command = "${path.module}/build_lambda.sh"
+  }
+
+  triggers = {
+    always_run = timestamp()
+  }
+}
+
+# Lambda para enviar alertas ao Discord
+resource "aws_lambda_function" "discord_alert" {
+  function_name = "discord-alerts"
+  runtime       = "python3.9"
+  role          = aws_iam_role.lambda_exec.arn
+  handler       = "index.lambda_handler"
+
+  filename         = "${path.module}/discord_alert.zip"
+  source_code_hash = filebase64sha256("${path.module}/discord_alert.zip")
+
+  environment {
+    variables = {
+      DISCORD_WEBHOOK_URL = var.discord_webhook_url
+    }
+  }
+}
+
+resource "aws_iam_role" "lambda_exec" {
+  name = "lambda-exec-discord"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action    = "sts:AssumeRole",
+        Effect    = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_logging" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# EventBridge para disparar alerta em eventos de deploy
+resource "aws_cloudwatch_event_rule" "deploy_events" {
+  name        = "react-app-deploy-events"
+  description = "Dispara evento no deploy do React App"
+  event_pattern = jsonencode({
+    source = ["aws.ec2", "aws.ecr"]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "lambda_target" {
+  rule      = aws_cloudwatch_event_rule.deploy_events.name
+  target_id = "send-to-discord"
+  arn       = aws_lambda_function.discord_alert.arn
+}
+
+resource "aws_lambda_permission" "allow_events" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.discord_alert.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.deploy_events.arn
+}
+
+
+  

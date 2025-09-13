@@ -26,3 +26,12 @@ variable "public_key" {
   type        = string
   default = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDBwTGvSRagdYJBXw3Y/ApYV5wgLy2YzXm2eIn0131mB/FPiONMsWLZrUe38hvIwdxwxPzGwMQYJ09TJAsGQldyIVa08tKRNedZ3Uji7CoaxKU2ByDSYNt+EVneur3TvqbAKEWCWF24kYhvd14XWRKw24ZdiOOKLOgBqm//J9Vvxbb6X5wqov7xIJEfprYqo8ntmGtM3Z7YkrC4ka94HIUfq4oaH3wg5agfOPneP22Gx75OiPuhB5oKf1gsd7E3ibFerWZX+jmrMIcZIl2CKPK7tiFDuLhgHE6B7hWFLwls1qj9SgvWDTl5VbwEP4hyH4Xi1BD/kUkk7IaisA/DQ+gn"
 }
+
+resource "aws_sns_topic" "alerts" {
+  name = "react-app-alerts"
+}
+
+variable "discord_webhook_url" {
+  description = "https://discord.com/api/webhooks/1416555712359694508/XHad9GG02g5CGpZH84rU0kuj4Wf5FlwI3T8jkGGES5n-Sdb86QxUMi_sIsvEg0B9gHP-"
+  type        = string
+}
