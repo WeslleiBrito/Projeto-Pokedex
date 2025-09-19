@@ -173,7 +173,7 @@ resource "aws_instance" "app" {
 
 resource "null_resource" "build_lambda" {
   provisioner "local-exec" {
-    command = "${path.module}/build_lambda.sh"
+    command = "bash ${path.module}/build_lambda.sh"
   }
 
   triggers = {
