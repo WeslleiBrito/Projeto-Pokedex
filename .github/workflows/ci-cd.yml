@@ -59,7 +59,7 @@ jobs:
         working-directory: ./infra
       - run: terraform validate
         working-directory: ./infra
-      - run: terraform apply -auto-approve -var="allowed_ssh_cidr=${{ secrets.ALLOWED_SSH_CIDR }}"
+      - run: terraform apply -auto-approve -var="allowed_ssh_cidr=${{ secrets.ALLOWED_SSH_CIDR }}" -var="discord_webhook_url=${{ secrets.DISCORD_WEBHOOK_URL }}"
         working-directory: ./infra
 
   deploy:
