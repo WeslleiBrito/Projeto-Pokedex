@@ -32,6 +32,6 @@ resource "aws_sns_topic" "alerts" {
 }
 
 variable "discord_webhook_url" {
-  description = "https://discord.com/api/webhooks/1416555712359694508/XHad9GG02g5CGpZH84rU0kuj4Wf5FlwI3T8jkGGES5n-Sdb86QxUMi_sIsvEg0B9gHP-"
+  description = "URL Webhook Discord"
   type        = string
 }

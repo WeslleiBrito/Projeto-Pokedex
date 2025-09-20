@@ -11,6 +11,9 @@ terraform {
     random = {
       source = "hashicorp/random"
     }
+    null = {
+      source = "hashicorp/null"
+    }
   }
 }
 
@@ -20,7 +23,7 @@ provider "aws" {
 
 # --- ECR repo
 resource "aws_ecr_repository" "repo" {
-  name = var.ecr_repo_name
+  name         = var.ecr_repo_name
   force_delete = true
   image_scanning_configuration {
     scan_on_push = true
@@ -54,13 +57,11 @@ data "aws_iam_policy_document" "ec2_ecr_policy" {
     resources = ["*"]
   }
 
-  # logs
   statement {
     actions   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
     resources = ["*"]
   }
 
-  # SSM
   statement {
     actions   = ["ssm:DescribeInstanceInformation", "ssm:GetCommandInvocation", "ssm:SendCommand"]
     resources = ["*"]
@@ -79,13 +80,16 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-# Anexa a política gerenciada do SSM ao IAM Role da instância EC2
 resource "aws_iam_role_policy_attachment" "ssm_core" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 # --- Security Group
+data "aws_vpc" "default" {
+  default = true
+}
+
 resource "aws_security_group" "web_sg" {
   name        = "react-web-sg"
   description = "Allow SSH, HTTP and HTTPS"
@@ -123,11 +127,6 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# --- Default VPC
-data "aws_vpc" "default" {
-  default = true
-}
-
 # --- EC2 instance
 resource "aws_instance" "app" {
   ami                         = "ami-035efd31ab8835d8a"
@@ -142,75 +141,49 @@ resource "aws_instance" "app" {
   }
 
   user_data = <<-EOF
-            #!/bin/bash
-            set -e
-            apt-get update -y
-            apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release unzip
+              #!/bin/bash
+              set -e
+              apt-get update -y
+              apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release unzip
 
-            # Docker
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-            add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-            apt-get update -y
-            apt-get install -y docker-ce docker-ce-cli containerd.io
-            usermod -aG docker ubuntu
+              # Docker
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+              add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+              apt-get update -y
+              apt-get install -y docker-ce docker-ce-cli containerd.io
+              usermod -aG docker ubuntu
 
-            # AWS CLI v2
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip awscliv2.zip
-            ./aws/install
+              # AWS CLI v2
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip awscliv2.zip
+              ./aws/install
 
-            # Instalar SSM Agent no Ubuntu
-            snap install amazon-ssm-agent --classic
-            systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
-            systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service
+              # Instalar SSM Agent
+              snap install amazon-ssm-agent --classic
+              systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
+              systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service
 
-            systemctl enable docker
-            systemctl start docker
-            EOF
-
+              systemctl enable docker
+              systemctl start docker
+              EOF
 }
 
-
-resource "null_resource" "build_lambda" {
-  provisioner "local-exec" {
-    command = "bash ${path.module}/build_lambda.sh"
-  }
-
-  triggers = {
-    always_run = timestamp()
-  }
+# --- CloudWatch Logs
+resource "aws_cloudwatch_log_group" "react_app_logs" {
+  name              = "react-app-logs"
+  retention_in_days = 7
 }
 
-# Lambda para enviar alertas ao Discord
-resource "aws_lambda_function" "discord_alert" {
-  function_name = "discord-alerts"
-  runtime       = "python3.9"
-  role          = aws_iam_role.lambda_exec.arn
-  handler       = "index.lambda_handler"
-
-  filename         = "${path.module}/discord_alert.zip"
-  source_code_hash = filebase64sha256("${path.module}/discord_alert.zip")
-
-  environment {
-    variables = {
-      DISCORD_WEBHOOK_URL = var.discord_webhook_url
-    }
-  }
-}
-
+# --- Lambda (já existente no seu código)
 resource "aws_iam_role" "lambda_exec" {
-  name = "lambda-exec-discord"
+  name = "lambda-exec-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [
-      {
-        Action    = "sts:AssumeRole",
-        Effect    = "Allow",
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      }
-    ]
+    Statement = [{
+      Action    = "sts:AssumeRole",
+      Effect    = "Allow",
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
   })
 }
 
@@ -219,28 +192,106 @@ resource "aws_iam_role_policy_attachment" "lambda_logging" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# EventBridge para disparar alerta em eventos de deploy
-resource "aws_cloudwatch_event_rule" "deploy_events" {
-  name        = "react-app-deploy-events"
-  description = "Dispara evento no deploy do React App"
-  event_pattern = jsonencode({
-    source = ["aws.ec2", "aws.ecr"]
-  })
+resource "null_resource" "build_lambda" {
+  provisioner "local-exec" {
+    command     = "bash build_lambda.sh"
+    interpreter = ["bash", "-c"]
+  }
+
+  triggers = {
+    always_run = timestamp()
+  }
 }
 
-resource "aws_cloudwatch_event_target" "lambda_target" {
-  rule      = aws_cloudwatch_event_rule.deploy_events.name
-  target_id = "send-to-discord"
+resource "aws_lambda_function" "discord_alert" {
+  function_name = "discord-alert"
+  role          = aws_iam_role.lambda_exec.arn
+  runtime       = "python3.9"
+  handler       = "index.lambda_handler"
+  filename      = "${path.module}/lambda.zip"
+
+  environment {
+    variables = {
+      DISCORD_WEBHOOK_URL = var.discord_webhook_url
+    }
+  }
+}
+
+# --- EventBridge (EC2 events → Lambda)
+resource "aws_cloudwatch_event_rule" "ec2_state_change" {
+  name        = "ec2-state-change"
+  description = "Notifica mudanças de estado da EC2"
+  event_pattern = <<EOF
+{
+  "source": ["aws.ec2"],
+  "detail-type": ["EC2 Instance State-change Notification"]
+}
+EOF
+}
+
+resource "aws_cloudwatch_event_target" "ec2_to_lambda" {
+  rule      = aws_cloudwatch_event_rule.ec2_state_change.name
+  target_id = "EC2LambdaTarget"
   arn       = aws_lambda_function.discord_alert.arn
 }
 
-resource "aws_lambda_permission" "allow_events" {
-  statement_id  = "AllowExecutionFromCloudWatch"
+resource "aws_lambda_permission" "allow_ec2_event" {
+  statement_id  = "AllowExecutionFromEventBridgeEC2"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.discord_alert.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.deploy_events.arn
+  source_arn    = aws_cloudwatch_event_rule.ec2_state_change.arn
 }
 
+# --- EventBridge (ECR push → Lambda)
+resource "aws_cloudwatch_event_rule" "ecr_image_push" {
+  name        = "ecr-image-push"
+  description = "Notifica quando uma nova imagem é enviada ao ECR"
+  event_pattern = <<EOF
+{
+  "source": ["aws.ecr"],
+  "detail-type": ["ECR Image Action"],
+  "detail": { "action-type": ["PUSH"] }
+}
+EOF
+}
 
-  
+resource "aws_cloudwatch_event_target" "ecr_to_lambda" {
+  rule      = aws_cloudwatch_event_rule.ecr_image_push.name
+  target_id = "ECRLambdaTarget"
+  arn       = aws_lambda_function.discord_alert.arn
+}
+
+resource "aws_lambda_permission" "allow_ecr_event" {
+  statement_id  = "AllowExecutionFromEventBridgeECR"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.discord_alert.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.ecr_image_push.arn
+}
+
+# --- EventBridge (Deploy custom events → Lambda)
+resource "aws_cloudwatch_event_rule" "deploy_status" {
+  name        = "deploy-status"
+  description = "Recebe eventos customizados do pipeline"
+  event_pattern = <<EOF
+{
+  "source": ["custom.cicd"],
+  "detail-type": ["Deploy Status"]
+}
+EOF
+}
+
+resource "aws_cloudwatch_event_target" "deploy_to_lambda" {
+  rule      = aws_cloudwatch_event_rule.deploy_status.name
+  target_id = "DeployLambdaTarget"
+  arn       = aws_lambda_function.discord_alert.arn
+}
+
+resource "aws_lambda_permission" "allow_deploy_event" {
+  statement_id  = "AllowExecutionFromEventBridgeDeploy"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.discord_alert.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.deploy_status.arn
+}
