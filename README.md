@@ -155,6 +155,10 @@ npm run lint:fix
 
 ---
 
+## 📸 Prints
+
+<img width="1353" height="601" alt="image" src="https://github.com/user-attachments/assets/399d99c7-95e0-4690-ad26-fec9ce87cd17" />
+
 ## 🤝 Contribuindo
 
 1. Faça um fork do projeto
@@ -168,3 +172,4 @@ npm run lint:fix
 ## 📄 Licença
 
 Este projeto está licenciado sob a [MIT License](LICENSE).
+
