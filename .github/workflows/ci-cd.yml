@@ -57,6 +57,11 @@ jobs:
       - uses: hashicorp/setup-terraform@v2
       - run: terraform init
         working-directory: ./infra
+      - name: Dar permissão de execução ao script
+        run: chmod +x ./infra/import_if_exists.sh
+      - name: Import recursos existentes
+        run: ./import_if_exists.sh
+        working-directory: ./infra
       - run: terraform validate
         working-directory: ./infra
       - run: terraform apply -auto-approve -var="allowed_ssh_cidr=${{ secrets.ALLOWED_SSH_CIDR }}" -var="discord_webhook_url=${{ secrets.DISCORD_WEBHOOK_URL }}"
